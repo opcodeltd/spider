@@ -1,0 +1,10 @@
+*.pyc
+
+# Virtual environment stuff
+
+/.Python
+/bin
+/include
+/lib
+/share
+
