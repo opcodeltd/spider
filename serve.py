@@ -18,7 +18,7 @@ log.setLevel(logging.DEBUG)
 class Server(object):
     def __init__(self, database):
         self.database = database
-        self.db = shelve.open(database)
+        self.db = shelve.open(database, 'r')
         self.url = furl(self.db['config']['url'])
 
     def __call__(self, environ, start_response):
@@ -33,8 +33,10 @@ class Server(object):
 
         data = self.db[str(lookup_url)]
 
+        data['headers'].pop('content-encoding', None)
+
         return Response(
-            open(data['filename']),
+            open(data['filename'], 'rb').read(),
             status = data['status_code'],
             headers = data['headers'].items(),
         )(environ, start_response)

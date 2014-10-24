@@ -39,15 +39,20 @@ class Fetcher(object):
         self.spider()
 
     def spider(self):
-        while len(self.urls):
-            url = self.urls.pop()
-            if str(url) in self.db:
-                # Already got content for this URL
-                continue
+        import ipdb
+        with ipdb.launch_ipdb_on_exception():
+            while len(self.urls):
+                url = self.urls.pop()
+                if str(url) in self.db:
+                    # Already got content for this URL
+                    continue
 
-            response = self.request(url)
-            self.db[str(url)] = dict([(k, v) for k, v in response.items() if k != 'data'])
-            self.urls.extend(self.extract_links(response))
+                response = self.request(url)
+                self.db[str(url)] = dict([(k, v) for k, v in response.items() if k != 'data'])
+                try:
+                    self.urls.extend(self.extract_links(response))
+                except Exception as e:
+                    log.error("Failed to parse URLs from %s" % url)
 
     def request(self, url):
         log.debug('fetching: %s', url)

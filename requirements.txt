@@ -3,3 +3,4 @@ click
 furl
 beautifulsoup
 werkzeug
+ipdb
