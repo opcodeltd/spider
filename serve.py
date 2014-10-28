@@ -2,41 +2,44 @@
 
 from __future__ import absolute_import
 
-import shelve
-import requests
 from furl import furl
-from BeautifulSoup import BeautifulSoup
 import os
-import hashlib
+from common import Common
 from werkzeug.wrappers import Request, Response
+import json
 
 import logging
 logging.basicConfig()
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 
-class Server(object):
+class Server(Common):
     def __init__(self, database):
         self.database = database
-        self.db = shelve.open(database, 'r')
-        self.url = furl(self.db['config']['url'])
+
+        config_filename = os.path.join(database, 'config.json')
+        config = json.load(open(config_filename))
+        self.url = furl(config['url'])
 
     def __call__(self, environ, start_response):
         request = Request(environ)
         lookup_url = self.url.copy().join(request.path)
 
-        if str(lookup_url) not in self.db and request.path == '/':
+        if not self.url_exists(lookup_url) and request.path == '/':
             lookup_url = self.url.copy()
 
-        if str(lookup_url) not in self.db:
+        if not self.url_exists(lookup_url):
             return Response('Not found', 404)(environ, start_response)
 
-        data = self.db[str(lookup_url)]
+        data = self.url_read(lookup_url)
 
         data['headers'].pop('content-encoding', None)
 
+        with open(self.filename_for(lookup_url, data=True), 'rb') as fh:
+            content = fh.read()
+
         return Response(
-            open(data['filename'], 'rb').read(),
+            content,
             status = data['status_code'],
             headers = data['headers'].items(),
         )(environ, start_response)

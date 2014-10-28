@@ -11,26 +11,34 @@ def cli():
 @click.argument('url')
 @click.argument('database')
 def spider(url, database):
-    from  fetcher import Fetcher
-    with Fetcher(url, database) as fetcher:
-        fetcher.run()
+    from fetcher import Fetcher
+    Fetcher(url, database).run()
 
 @cli.command()
 @click.argument('database')
 def serve(database):
     from serve import Server
     from werkzeug.serving import run_simple
+
     app = Server(database)
-    run_simple('localhost', 8080, app, use_reloader=True, threaded=True)
+    try:
+        run_simple('localhost', 8080, app, threaded=True)
+    except KeyboardInterrupt:
+        print "KILLING?"
+        raise
 
 @cli.command()
 @click.argument('database')
 def dump(database):
-    import shelve
-    db = shelve.open(database, 'r')
-
-    from pprint import pprint
-    pprint(dict(db.items()))
+    import os
+    import json
+    for root, dirs, files in os.walk(database):
+        for filename in files:
+            if not filename.endswith('.data'):
+                continue
+            with open(os.path.join(root, filename[:-5])) as fh:
+                data = json.load(fh)
+                print data['url']
 
 if __name__ == '__main__':
     cli()

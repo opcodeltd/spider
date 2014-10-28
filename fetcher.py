@@ -2,80 +2,98 @@
 
 from __future__ import absolute_import
 
-import shelve
 import requests
 from furl import furl
 from BeautifulSoup import BeautifulSoup
 import os
-import hashlib
 import re
+import json
+from common import Common
 
 import logging
 logging.basicConfig()
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 
-class Fetcher(object):
+class Fetcher(Common):
     def __init__(self, url, database):
         self.url = furl(url)
         self.database = database
-        self.db = shelve.open(database)
-        os.mkdir("%s-files" % database)
 
-    def __enter__(self):
-        return self
+        if not os.path.isdir(database):
+            os.mkdir(database)
 
-    def __exit__(self, type, value, traceback):
-        self.db.close()
+        config_filename = os.path.join(database, 'config.json')
+
+        if os.path.isfile(config_filename):
+            config = json.load(open(config_filename))
+            if config['url'] != str(self.url):
+                raise Exception("Wrong base URL for this database")
+        else:
+            with open(config_filename, 'w') as fh:
+                json.dump(dict(
+                    url = str(self.url)
+                ), fh)
 
     def run(self):
-        if 'config' in self.db:
-            raise Exception("Database has already started spidering")
+        log.debug("Loading existing state")
 
-        self.db['config'] = dict(
-            url = str(self.url)
-        )
-        self.urls = [self.url]
+        init_urls = set([self.url])
+
+        for root, dirs, files in os.walk(self.database):
+            for filename in files:
+                if not filename.endswith('.data'):
+                    continue
+                with open(os.path.join(root, filename[:-5])) as fh:
+                    data = json.load(fh)
+
+                with open(self.filename_for(data['url'], data=True), 'rb') as fh:
+                    data['data'] = fh.read()
+
+                try:
+                    init_urls.update(self.extract_links(data))
+                except Exception as e:
+                    log.error("Failed to parse URLs from %s: %s" % (data['url'], e))
+
+        self.urls = list(init_urls)
+        log.debug("Starting spider")
         self.spider()
+        log.debug("Finished spider")
 
     def spider(self):
         import ipdb
+        url = None
         with ipdb.launch_ipdb_on_exception():
-            while len(self.urls):
-                url = self.urls.pop()
-                if str(url) in self.db:
-                    # Already got content for this URL
-                    continue
+            try:
+                while len(self.urls):
+                    url = self.urls.pop()
 
-                response = self.request(url)
-                self.db[str(url)] = dict([(k, v) for k, v in response.items() if k != 'data'])
-                try:
-                    self.urls.extend(self.extract_links(response))
-                except Exception as e:
-                    log.error("Failed to parse URLs from %s" % url)
+                    if self.url_exists(url):
+                        # Already have this request stored
+                        url = None
+                        continue
+
+                    response = self.request(url)
+
+                    self.url_write(url, response)
+
+                    try:
+                        self.urls.extend(self.extract_links(response))
+                    except Exception as e:
+                        log.error("Failed to parse URLs from %s: %s" % (url, e))
+                    url = None
+            finally:
+                if url:
+                    self.url_delete(url)
 
     def request(self, url):
         log.debug('fetching: %s', url)
         res = requests.get(str(url), allow_redirects=False)
-        filename = self.store_file(url, res.content)
         return dict(
-            filename    = filename,
-            data        = res.text,
+            url         = str(url),
+            data        = res.content,
             status_code = res.status_code,
-            headers     = res.headers,
-        )
-
-    def store_file(self, url, data):
-        filename = self.filename_for(url)
-        with open(filename, 'wb') as fh:
-            fh.write(data)
-
-        return filename
-
-    def filename_for(self, url):
-        return "%s-files/%s" % (
-            self.database,
-            hashlib.md5(str(url)).hexdigest(),
+            headers     = dict(res.headers),
         )
 
     def extract_links(self, response):
