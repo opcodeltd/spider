@@ -23,17 +23,20 @@ class Server(Common):
 
     def __call__(self, environ, start_response):
         request = Request(environ)
-        lookup_url = self.url.copy().join(request.path)
+        lookup_url = self.url.copy().join(request.full_path)
 
-        if not self.url_exists(lookup_url) and request.path == '/':
+        if not self.url_exists(lookup_url) and request.full_path == '/':
             lookup_url = self.url.copy()
 
         if not self.url_exists(lookup_url):
+            log.debug('%d: %s' % (404, lookup_url))
             return Response('Not found', 404)(environ, start_response)
 
         data = self.url_read(lookup_url)
 
         data['headers'].pop('content-encoding', None)
+
+        log.debug('%d: %s' % (data['status_code'], lookup_url))
 
         with open(self.filename_for(lookup_url, data=True), 'rb') as fh:
             content = fh.read()
