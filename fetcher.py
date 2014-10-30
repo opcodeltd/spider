@@ -39,27 +39,6 @@ class Fetcher(Common):
                 ), fh)
 
     def run(self):
-        log.debug("Loading existing state")
-
-        init_urls = set([self.url])
-        redis.sadd(FETCH_SET, str(self.url))
-
-        for root, dirs, files in os.walk(self.database):
-            for filename in files:
-                if not filename.endswith('.data'):
-                    continue
-                with open(os.path.join(root, filename[:-5])) as fh:
-                    data = json.load(fh)
-
-                with open(self.filename_for(data['url'], data=True), 'rb') as fh:
-                    data['data'] = fh.read()
-
-                try:
-                    init_urls.update(self.extract_links(data))
-                except Exception as e:
-                    log.error("Failed to parse URLs from %s: %s" % (data['url'], e))
-
-        self.urls = list(init_urls)
         log.debug("Starting spider")
         self.spider()
         log.debug("Finished spider")
@@ -93,6 +72,7 @@ class Fetcher(Common):
                     url = None
             finally:
                 if url:
+                    redis.sadd(FETCH_SET, str(url))
                     self.url_delete(url)
 
     def request(self, url):
