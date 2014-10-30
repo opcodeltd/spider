@@ -2,15 +2,18 @@
 
 from __future__ import absolute_import
 
+from BeautifulSoup import BeautifulSoup
 import hashlib
 import os
 import json
 import logging
+import re
 log = logging.getLogger(__name__)
 
 class Common(object):
     def filename_for(self, url, mkdir=False, data=False):
         filename = hashlib.md5(str(url)).hexdigest()
+        #print " => %s %s" % (filename, str(url))
         dirname = filename[0:2]
         if mkdir and not os.path.isdir(os.path.join(self.database, dirname)):
             os.mkdir(os.path.join(self.database, dirname))
@@ -43,3 +46,33 @@ class Common(object):
             os.unlink(self.filename_for(url, data=True))
         except OSError:
             pass
+
+    def extract_links(self, response):
+        if response['status_code'] >= 300 and response['status_code'] < 400:
+            if 'location' in response['headers']:
+                return self.should_follow_filter(response['headers']['location'])
+
+        if response['status_code'] == 200 and 'content-type' in response['headers']:
+            if response['headers']['content-type'].startswith('text/html'):
+                soup = BeautifulSoup(response['data'])
+                links = []
+                for attr in ['href', 'src']:
+                    for e in soup.findAll(attrs = {attr: True}):
+                        if e[attr].startswith('tel:'):
+                            continue
+                        links.append(e[attr])
+                return self.should_follow_filter(*links)
+            if response['headers']['content-type'].startswith('text/css'):
+                return self.should_follow_filter(*re.findall(r'''url \( ["']? ([^)]+?) ["']? \)''', response['data'], flags=re.X))
+
+        return []
+
+    def should_follow_filter(self, *urls):
+        to_follow = []
+        for url in urls:
+            url = self.url.copy().join(url).remove(fragment=True)
+            url.query.remove('sid')
+            if self.url.scheme == url.scheme and self.url.host == url.host and str(url.path).startswith(str(self.url.path)):
+                to_follow.append(url)
+
+        return to_follow

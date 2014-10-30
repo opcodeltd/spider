@@ -24,6 +24,7 @@ class Server(Common):
     def __call__(self, environ, start_response):
         request = Request(environ)
         lookup_url = self.url.copy().join(request.full_path)
+        lookup_url.query.remove('sid')
 
         if not self.url_exists(lookup_url) and request.full_path == '/':
             lookup_url = self.url.copy()
@@ -37,6 +38,13 @@ class Server(Common):
         data['headers'].pop('content-encoding', None)
 
         log.debug('%d: %s' % (data['status_code'], lookup_url))
+
+        if data['status_code'] >= 300 and data['status_code'] < 400:
+            url = furl(data['headers']['location'])
+            url.scheme = request.scheme
+            url.host = request.host
+            url.port = None
+            data['headers']['location'] = str(url)
 
         with open(self.filename_for(lookup_url, data=True), 'rb') as fh:
             content = fh.read()

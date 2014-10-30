@@ -4,11 +4,14 @@ from __future__ import absolute_import
 
 import requests
 from furl import furl
-from BeautifulSoup import BeautifulSoup
 import os
-import re
 import json
 from common import Common
+from redis import StrictRedis
+redis = StrictRedis()
+
+FETCH_SET = 'to_fetch'
+SEEN_SET  = 'fetched'
 
 import logging
 logging.basicConfig()
@@ -39,6 +42,7 @@ class Fetcher(Common):
         log.debug("Loading existing state")
 
         init_urls = set([self.url])
+        redis.sadd(FETCH_SET, str(self.url))
 
         for root, dirs, files in os.walk(self.database):
             for filename in files:
@@ -66,9 +70,10 @@ class Fetcher(Common):
         with ipdb.launch_ipdb_on_exception():
             try:
                 while len(self.urls):
-                    url = self.urls.pop()
+                    url = furl(redis.spop(FETCH_SET))
+                    url.query.remove('sid')  # This shouldn't actually be necessary, but it's a safety
 
-                    if self.url_exists(url):
+                    if redis.ismember(SEEN_SET, str(url)):
                         # Already have this request stored
                         url = None
                         continue
@@ -76,9 +81,13 @@ class Fetcher(Common):
                     response = self.request(url)
 
                     self.url_write(url, response)
+                    redis.sadd(SEEN_SET, str(url))
 
                     try:
-                        self.urls.extend(self.extract_links(response))
+                        urls = set([str(x) for x in self.extract_links(response)])
+                        urls = [x for x in urls if not redis.ismember(SEEN_SET, str(x))]
+                        if len(urls):
+                            redis.sadd(FETCH_SET, *urls)
                     except Exception as e:
                         log.error("Failed to parse URLs from %s: %s" % (url, e))
                     url = None
@@ -95,32 +104,3 @@ class Fetcher(Common):
             status_code = res.status_code,
             headers     = dict(res.headers),
         )
-
-    def extract_links(self, response):
-        if response['status_code'] >= 300 and response['status_code'] < 400:
-            if 'location' in response['headers']:
-                return self.should_follow_filter(response['headers']['location'])
-
-        if response['status_code'] == 200 and 'content-type' in response['headers']:
-            if response['headers']['content-type'].startswith('text/html'):
-                soup = BeautifulSoup(response['data'])
-                links = []
-                for attr in ['href', 'src']:
-                    for e in soup.findAll(attrs = {attr: True}):
-                        if e[attr].startswith('tel:'):
-                            continue
-                        links.append(e[attr])
-                return self.should_follow_filter(*links)
-            if response['headers']['content-type'].startswith('text/css'):
-                return self.should_follow_filter(*re.findall(r'''url \( ["']? ([^)]+?) ["']? \)''', response['data'], flags=re.X))
-
-        return []
-
-    def should_follow_filter(self, *urls):
-        to_follow = []
-        for url in urls:
-            url = self.url.copy().join(url).remove(fragment=True)
-            if self.url.scheme == url.scheme and self.url.host == url.host and str(url.path).startswith(str(self.url.path)):
-                to_follow.append(url)
-
-        return to_follow

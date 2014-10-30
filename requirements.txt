@@ -4,3 +4,4 @@ furl
 beautifulsoup
 werkzeug
 ipdb
+redis

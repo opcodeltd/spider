@@ -29,6 +29,12 @@ def serve(database):
 
 @cli.command()
 @click.argument('database')
+def extract(database):
+    from extractor import Extractor
+    Extractor(database).run()
+
+@cli.command()
+@click.argument('database')
 def dump(database):
     import os
     import json
