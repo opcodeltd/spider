@@ -52,7 +52,7 @@ class Fetcher(Common):
                 while url:
                     url.query.remove('sid')  # This shouldn't actually be necessary, but it's a safety
 
-                    if redis.ismember(SEEN_SET, str(url)):
+                    if redis.sismember(SEEN_SET, str(url)):
                         # Already have this request stored
                         url = None
                         continue
@@ -64,7 +64,7 @@ class Fetcher(Common):
 
                     try:
                         urls = set([str(x) for x in self.extract_links(response)])
-                        urls = [x for x in urls if not redis.ismember(SEEN_SET, str(x))]
+                        urls = [x for x in urls if not redis.sismember(SEEN_SET, str(x))]
                         if len(urls):
                             redis.sadd(FETCH_SET, *urls)
                     except Exception as e:
