@@ -48,8 +48,8 @@ class Fetcher(Common):
         url = None
         with ipdb.launch_ipdb_on_exception():
             try:
-                while len(self.urls):
-                    url = furl(redis.spop(FETCH_SET))
+                url = furl(redis.spop(FETCH_SET))
+                while url:
                     url.query.remove('sid')  # This shouldn't actually be necessary, but it's a safety
 
                     if redis.ismember(SEEN_SET, str(url)):
@@ -69,7 +69,10 @@ class Fetcher(Common):
                             redis.sadd(FETCH_SET, *urls)
                     except Exception as e:
                         log.error("Failed to parse URLs from %s: %s" % (url, e))
-                    url = None
+
+                    url = furl(redis.spop(FETCH_SET))
+
+                url = None
             finally:
                 if url:
                     redis.sadd(FETCH_SET, str(url))
