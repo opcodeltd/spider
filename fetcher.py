@@ -64,9 +64,11 @@ class Fetcher(Common):
 
                     try:
                         urls = set([str(x) for x in self.extract_links(response)])
-                        urls = [x for x in urls if not redis.sismember(SEEN_SET, str(x))]
+                        urls = [x for x in urls if not redis.sismember(SEEN_SET, x)]
                         if len(urls):
                             redis.sadd(FETCH_SET, *urls)
+                        with open(self.filename_for(url, ext='urls'), 'w') as fh:
+                            fh.write("\n".join(urls) + "\n")
                     except Exception as e:
                         log.error("Failed to parse URLs from %s: %s" % (url, e))
 
