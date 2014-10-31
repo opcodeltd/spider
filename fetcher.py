@@ -54,7 +54,7 @@ class Fetcher(Common):
 
                     if redis.sismember(SEEN_SET, str(url)):
                         # Already have this request stored
-                        url = None
+                        url = furl(redis.spop(FETCH_SET))
                         continue
 
                     response = self.request(url)
