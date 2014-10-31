@@ -32,7 +32,7 @@ class Fixer(Common):
                     continue
 
                 # Create the new URL
-                if not self.url_exists(new_url):
+                if new_url and not self.url_exists(new_url):
                     log.debug("Creating %s from %s" % (new_url, url))
                     with open(self.filename_for(data['url'], ext='data'), 'rb') as fh:
                         data['data'] = fh.read()

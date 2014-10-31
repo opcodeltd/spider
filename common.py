@@ -28,6 +28,9 @@ class Common(object):
                 if key not in ['name', 'file']:
                     url.query.remove(key)
 
+        if url.query.params.get('file') in ['posting', 'printview', 'privmsg']:
+            return None
+
         return url
 
     def filename_for(self, url, mkdir=False, ext=None):
@@ -98,7 +101,7 @@ class Common(object):
         for url in urls:
             url = self.url.copy().join(url).remove(fragment=True)
             url = self.preprocess_url(url)
-            if self.url.scheme == url.scheme and self.url.host == url.host and str(url.path).startswith(str(self.url.path)):
+            if url and self.url.scheme == url.scheme and self.url.host == url.host and str(url.path).startswith(str(self.url.path)):
                 to_follow.append(url)
 
         return to_follow

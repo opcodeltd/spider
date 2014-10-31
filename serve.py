@@ -26,10 +26,10 @@ class Server(Common):
         lookup_url = self.url.copy().join(request.full_path)
         lookup_url = self.preprocess_url(lookup_url)
 
-        if not self.url_exists(lookup_url) and request.full_path == '/':
+        if lookup_url and not self.url_exists(lookup_url) and request.full_path == '/':
             lookup_url = self.url.copy()
 
-        if not self.url_exists(lookup_url):
+        if not lookup_url or not self.url_exists(lookup_url):
             log.debug('%d: %s' % (404, lookup_url))
             return Response('Not found', 404)(environ, start_response)
 
