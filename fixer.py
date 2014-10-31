@@ -28,7 +28,7 @@ class Fixer(Common):
                 url = furl(data['url'])
                 new_url = self.preprocess_url(url)
 
-                if url == new_url:
+                if new_url and url == new_url:
                     continue
 
                 # Create the new URL
