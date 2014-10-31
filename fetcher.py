@@ -52,7 +52,7 @@ class Fetcher(Common):
                 while url:
                     url = self.preprocess_url(url)
 
-                    if not url or redis.sismember(SEEN_SET, str(url)):
+                    if not str(url) or redis.sismember(SEEN_SET, str(url)):
                         # Already have this request stored (or don't want it)
                         log.debug('skipping: %s', url)
                         url = furl(redis.spop(FETCH_SET))
