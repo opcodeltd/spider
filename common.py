@@ -8,10 +8,29 @@ import os
 import json
 import logging
 import re
+from furl import furl
 log = logging.getLogger(__name__)
 
 class Common(object):
-    def filename_for(self, url, mkdir=False, data=False):
+    def __init__(self, database):
+        self.database = database
+
+        config_filename = os.path.join(database, 'config.json')
+        config = json.load(open(config_filename))
+        self.url = furl(config['url'])
+
+    def preprocess_url(self, url):
+        url = furl(url)
+        url.query.remove('sid')
+
+        if url.query.params.get('file') == 'login':
+            for key in url.query.params.keys():
+                if key not in ['name', 'file']:
+                    url.query.remove(key)
+
+        return url
+
+    def filename_for(self, url, mkdir=False, ext=None):
         filename = hashlib.md5(str(url)).hexdigest()
         #print " => %s %s" % (filename, str(url))
         dirname = filename[0:2]
@@ -19,15 +38,17 @@ class Common(object):
             os.mkdir(os.path.join(self.database, dirname))
 
         fullpath = os.path.join(self.database, dirname, filename)
-        if data:
-            return "%s.data" % fullpath
+
+        if ext:
+            return "%s.%s" % (fullpath, ext)
+
         return fullpath
 
     def url_exists(self, url):
         return os.path.isfile(self.filename_for(url))
 
     def url_write(self, url, content):
-        with open(self.filename_for(url, mkdir=True, data=True), 'w') as fh:
+        with open(self.filename_for(url, mkdir=True, ext='data'), 'w') as fh:
             fh.write(content['data'])
         with open(self.filename_for(url, mkdir=True), 'w') as fh:
             json.dump(dict([(k, v) for k, v in content.items() if k != 'data']), fh)
@@ -37,13 +58,16 @@ class Common(object):
             return json.load(fh)
 
     def url_delete(self, url):
-        log.warn("Deleting potentially partial state for %s" % url)
         try:
             os.unlink(self.filename_for(url))
         except OSError:
             pass
         try:
-            os.unlink(self.filename_for(url, data=True))
+            os.unlink(self.filename_for(url, ext='data'))
+        except OSError:
+            pass
+        try:
+            os.unlink(self.filename_for(url, ext='urls'))
         except OSError:
             pass
 
@@ -60,6 +84,8 @@ class Common(object):
                     for e in soup.findAll(attrs = {attr: True}):
                         if e[attr].startswith('tel:'):
                             continue
+                        if e[attr].startswith('aim:'):
+                            continue
                         links.append(e[attr])
                 return self.should_follow_filter(*links)
             if response['headers']['content-type'].startswith('text/css'):
@@ -71,7 +97,7 @@ class Common(object):
         to_follow = []
         for url in urls:
             url = self.url.copy().join(url).remove(fragment=True)
-            url.query.remove('sid')
+            url = self.preprocess_url(url)
             if self.url.scheme == url.scheme and self.url.host == url.host and str(url.path).startswith(str(self.url.path)):
                 to_follow.append(url)
 

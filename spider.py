@@ -35,6 +35,12 @@ def extract(database):
 
 @cli.command()
 @click.argument('database')
+def fix(database):
+    from fixer import Fixer
+    Fixer(database).run()
+
+@cli.command()
+@click.argument('database')
 def dump(database):
     import os
     import json

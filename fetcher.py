@@ -50,7 +50,7 @@ class Fetcher(Common):
             try:
                 url = furl(redis.spop(FETCH_SET))
                 while url:
-                    url.query.remove('sid')  # This shouldn't actually be necessary, but it's a safety
+                    url = self.preprocess_url(url)
 
                     if redis.sismember(SEEN_SET, str(url)):
                         # Already have this request stored

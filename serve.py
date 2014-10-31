@@ -24,7 +24,7 @@ class Server(Common):
     def __call__(self, environ, start_response):
         request = Request(environ)
         lookup_url = self.url.copy().join(request.full_path)
-        lookup_url.query.remove('sid')
+        lookup_url = self.preprocess_url(lookup_url)
 
         if not self.url_exists(lookup_url) and request.full_path == '/':
             lookup_url = self.url.copy()
@@ -46,7 +46,7 @@ class Server(Common):
             url.port = None
             data['headers']['location'] = str(url)
 
-        with open(self.filename_for(lookup_url, data=True), 'rb') as fh:
+        with open(self.filename_for(lookup_url, ext='data'), 'rb') as fh:
             content = fh.read()
 
         return Response(
