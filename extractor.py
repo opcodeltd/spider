@@ -35,7 +35,8 @@ class Extractor(Common):
 
                 if os.path.isfile(url_filename):
                     with open(url_filename, 'r') as fh:
-                        urls = [l.strip() for l in fh.readlines() if l.strip()]
+                        urls = [l.strip() for l in fh.readlines()]
+                        urls = [u for u in urls if u]
                         if len(urls):
                             redis.sadd(FETCH_SET, *urls)
                 else:

@@ -64,7 +64,7 @@ class Fetcher(Common):
                     redis.sadd(SEEN_SET, str(url))
 
                     try:
-                        urls = set([str(x) for x in self.extract_links(response)])
+                        urls = set([str(x) for x in self.extract_links(response) if str(x)])
                         urls = [x for x in urls if not redis.sismember(SEEN_SET, x)]
                         if len(urls):
                             redis.sadd(FETCH_SET, *urls)
