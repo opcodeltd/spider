@@ -20,6 +20,9 @@ class Common(object):
         self.url = furl(config['url'])
 
     def preprocess_url(self, url):
+        if not url:
+            return None
+
         url = furl(url)
         url.query.remove('sid')
 
